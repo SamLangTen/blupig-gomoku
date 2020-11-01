@@ -94,6 +94,14 @@ void RenjuAINegamax::heuristicNegamax(const char *gs, int player, int depth, int
     delete[] _gs;
 }
 
+
+/*
+ * 核心算法，用于生成搜索树。该方法递归调用，传入指定的搜索深度和时间限制，
+ * 在每一次递归调用中都对深度和时间限制检查
+ * 
+ * 参数：
+ * 
+ */
 int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, int depth,
                                      bool enable_ab_pruning, int alpha, int beta,
                                      int *move_r, int *move_c) {
@@ -218,11 +226,16 @@ int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, in
     return max_score;
 }
 
+/*
+ * 这个函数会尝试在棋盘上所有可以下的位置都放置一个棋子，然后评估每个棋子的启发值。
+ * 在具体实现时，为了避免搜索范围过大，会将搜索区域收缩到当前已经放置了棋子的矩形区域附近
+ */
 void RenjuAINegamax::searchMovesOrdered(const char *gs, int player, std::vector<Move> *result) {
     // Clear and previous result
     result->clear();
 
     // Find an extent to reduce unnecessary calls to RenjuAIUtils::remoteCell
+    //这个过程就是收缩搜索区域，会生成一个矩形区域，我们称之为“含子区域”
     int min_r = INT_MAX, min_c = INT_MAX, max_r = INT_MIN, max_c = INT_MIN;
     for (int r = 0; r < g_board_size; ++r) {
         for (int c = 0; c < g_board_size; ++c) {
@@ -235,18 +248,25 @@ void RenjuAINegamax::searchMovesOrdered(const char *gs, int player, std::vector<
         }
     }
 
+    // 因为“含子区域”是紧贴当前已含棋子区域的，但“尝试放置”的区域会比“含子区域”稍宽（看下面的代码）
+    // 所以为了避免下面“尝试放置”时放出了搜索范围，会提前再次收缩“含子区域”，
+    // 由此得到的区域我们称之为“兼容的尝试放置区域”
     if (min_r - 2 < 0) min_r = 2;
     if (min_c - 2 < 0) min_c = 2;
     if (max_r + 2 >= g_board_size) max_r = g_board_size - 3;
     if (max_c + 2 >= g_board_size) max_c = g_board_size - 3;
 
     // Loop through all cells
+    // 搜索整个“尝试放置区域”，这个范围是由“兼容的尝试放置区域”每边向外扩展两格得到的
     for (int r = min_r - 2; r <= max_r + 2; ++r) {
         for (int c = min_c - 2; c <= max_c + 2; ++c) {
             // Consider only empty cells
+            // 已经下了棋子的区域就不尝试放置了
             if (gs[g_board_size * r + c] != 0) continue;
 
             // Skip remote cells (no pieces within 2 cells)
+            // 如果这个位置是一个远离当前“棋子团”的下棋位置，就不评估它了，直接跳过。
+            // 也就是说程序不会无端地把棋子下在远离棋子集中区域的地方
             if (RenjuAIUtils::remoteCell(gs, r, c)) continue;
 
             Move m;
@@ -254,12 +274,14 @@ void RenjuAINegamax::searchMovesOrdered(const char *gs, int player, std::vector<
             m.c = c;
 
             // Evaluate move
+            // 调用启发式评估函数评估这个下棋区域的启发值
             m.heuristic_val = RenjuAIEval::evalMove(gs, r, c, player);
 
             // Add move
             result->push_back(m);
         }
     }
+    //按启发值从大到小排序（通过Move类型重载的<运算符进行）
     std::sort(result->begin(), result->end());
 }
 

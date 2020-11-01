@@ -23,6 +23,13 @@
 #include <utils/globals.h>
 #include <cstring>
 
+/*
+ * 核心算法，用于产生步数。该方法递归调用，传入指定的搜索深度和时间限制，
+ * 在每一次递归调用中都对深度和时间限制检查
+ * 
+ * 参数：
+ * 
+ */
 void RenjuAIController::generateMove(const char *gs, int player, int search_depth, int time_limit,
                            int *actual_depth, int *move_r, int *move_c, int *winning_player,
                            unsigned int *node_count, unsigned int *eval_count, unsigned int *pm_count) {
