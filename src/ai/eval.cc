@@ -45,15 +45,16 @@ int RenjuAIEval::evalState(const char *gs, int player) {
     return score;
 }
 
+// 用于在启发式Negamax算法中评估启发值
 int RenjuAIEval::evalMove(const char *gs, int r, int c, int player) {
     // Check parameters
     if (gs == nullptr ||
         player < 1 || player > 2) return 0;
 
-    // Count evaluations
+    // 全局评估次数增1
     ++g_eval_count;
 
-    // Generate preset patterns structure in memory
+    // 生成“棋谱”，下面会按棋谱招数计算得分
     if (preset_patterns == nullptr) {
         generatePresetPatterns(&preset_patterns, &preset_scores, &preset_patterns_size, preset_patterns_skip);
     }
@@ -163,6 +164,7 @@ void RenjuAIEval::measureAllDirections(const char *gs,
     measureDirection(gs, r, c, 1, -1, player, consecutive, &adm[3]);
 }
 
+//测量某个方向的棋局情况并通过result返回
 void RenjuAIEval::measureDirection(const char *gs,
                                    int r, int c,
                                    int dr, int dc,
