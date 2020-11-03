@@ -27,27 +27,24 @@
 #include <ctime>
 #include <iostream>
 
-// kSearchBreadth is used to control branching factor
-// Different breadth configurations are possible:
-// A lower breadth for a higher depth
-// Or vice versa
+// 对于不同搜索深度，本层允许的宽度不一样。
+// 对于较浅的层级，搜索宽度较大，反之较小
 int RenjuAINegamax::presetSearchBreadth[5] = {17, 7, 5, 3, 3};
 
-// Estimated average branching factor for iterative deepening
+// 迭代加深时评估分支数，用于预估搜索时间
 #define kAvgBranchingFactor 3
 
-// Maximum depth for iterative deepening
+// 最大搜索深度
 #define kMaximumDepth 16
 
-// kScoreDecayFactor decays score each layer so the algorithm
-// prefers closer advantages
+// 定义每层的分数的“衰减比例”，详情请看调用了此define的代码
 #define kScoreDecayFactor 0.95f
 
 // 提供给外部调用的启发式Nagamax算法
 // 
 // 参数：
 // gs：游戏状态，即当前下了子的棋盘。可以看作是行优先存储的棋盘
-// player：玩家的使用的棋子颜色
+// player：程序的使用的棋子颜色
 // depth：搜索深度
 // time_limit：搜索时间限制
 // enable_ab_pruning：是否启用alpha-beta剪枝
@@ -119,25 +116,37 @@ void RenjuAINegamax::heuristicNegamax(const char *gs, int player, int depth, int
 // 
 // 参数：
 // 
-//
+// gs：游戏状态
+// player：程序使用的棋子颜色
+// initial_depth：初始深度
+// depth：本次调用的深度
+// enable_ab_pruning：是否进行alpha-beta剪枝
+// alpha：alpha的值
+// beta：beta的值
+// move_r：计算出的下一步应下棋子的行
+// move_c：计算出的下一步应下的棋子的列
 int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, int depth,
                                      bool enable_ab_pruning, int alpha, int beta,
                                      int *move_r, int *move_c) {
-    // Count node
+    // 全局生成结点数目增1
     ++g_node_count;
 
+    // 保存当前最高分数的走法
     int max_score = INT_MIN;
+    // opponent是玩家
     int opponent = player == 1 ? 2 : 1;
 
-    // Search and sort possible moves
+    // 针对AI和玩家生成所有可走的位置，并按位置的启发值排序
+    // candidate_moves的走法进行深度搜索，所以candidate_moves就是当前深度的可扩展结点
     std::vector<Move> moves_player, moves_opponent, candidate_moves;
     searchMovesOrdered(gs, player, &moves_player);
     searchMovesOrdered(gs, opponent, &moves_opponent);
 
-    // End if no move could be performed
+    // 如果AI无棋可走则退出
     if (moves_player.size() == 0) return 0;
 
-    // End directly if only one move or a winning move is found
+    // 如果AI只有一个位置可走，或者有“绝招”可走，就走这一步然后直接退出
+    // 绝招是指启发值超过指定限制的，即超过kRenjuAiEvalWinningScore，下绝招位置胜率会大大提升
     if (moves_player.size() == 1 || moves_player[0].heuristic_val >= kRenjuAiEvalWinningScore) {
         auto move = moves_player[0];
         if (move_r != nullptr) *move_r = move.r;
@@ -145,7 +154,9 @@ int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, in
         return move.heuristic_val;
     }
 
-    // If opponent has threatening moves, consider blocking them first
+    // 如果对方能出“绝招”，堵住对方出绝招的位置
+
+    // 用于标记是否该步是用来堵绝招
     bool block_opponent = false;
     int tmp_size = std::min(static_cast<int>(moves_opponent.size()), 2);
     if (moves_opponent[0].heuristic_val >= kRenjuAiEvalThreateningScore) {
@@ -153,20 +164,21 @@ int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, in
         for (int i = 0; i < tmp_size; ++i) {
             auto move = moves_opponent[i];
 
-            // Re-evaluate move as current player
+            // 堵住绝招后重新评估该步的启发值
             move.heuristic_val = RenjuAIEval::evalMove(gs, move.r, move.c, player);
 
-            // Add to candidate list
+            // 将“堵绝招”走法加入候选走法之一
             candidate_moves.push_back(move);
         }
     }
 
-    // Set breadth
+    // 根据深度设置搜索宽度，成负相关
+    // 随着本方法被递归调用，搜索宽度会逐渐增大
     int breadth = (initial_depth >> 1) - ((depth + 1) >> 1);
     if (breadth > 4) breadth = presetSearchBreadth[4];
     else             breadth = presetSearchBreadth[breadth];
 
-    // Copy moves for current player
+    // 按照breadth设定的值，添加breadth个启发值最大的走法到候选走法内（即要进行深度搜索的走法）
     tmp_size = std::min(static_cast<int>(moves_player.size()), breadth);
     for (int i = 0; i < tmp_size; ++i)
         candidate_moves.push_back(moves_player[i]);
@@ -179,58 +191,60 @@ int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, in
 //        }
 //    }
 
-    // Loop through every move
+    // 对每个走法再进行启发式Negamax搜索
     int size = static_cast<int>(candidate_moves.size());
     for (int i = 0; i < size; ++i) {
         auto move = candidate_moves[i];
 
-        // Execute move
+        // 尝试下棋，修改棋盘状态
         RenjuAIUtils::setCell(gs, move.r, move.c, static_cast<char>(player));
 
-        // Run negamax recursively
+        // 递归调用启发式Negamax算法进行深度搜索
         int score = 0;
-        if (depth > 1) score = heuristicNegamax(gs,                 // Game state
-                                                opponent,           // Change player
-                                                initial_depth,      // Initial depth
-                                                depth - 1,          // Reduce depth by 1
-                                                enable_ab_pruning,  // Alpha-Beta
+        if (depth > 1) score = heuristicNegamax(gs,                 // 游戏状态
+                                                opponent,           // 更换下棋的人，由对方下棋，即更换max和min方
+                                                initial_depth,      // 最初设定的深度
+                                                depth - 1,          // 当前深度
+                                                enable_ab_pruning,  // Alpha-Beta剪枝
                                                 -beta,              //
                                                 -alpha + move.heuristic_val,
-                                                nullptr,            // Result move not required
-                                                nullptr);
+                                                nullptr,            // 对于启发式深度搜索而言，不需要具体策略
+                                                nullptr);           // 只需要得到本层不同结点出发的深度搜索能达到的最优值就可以了
 
-        // Closer moves get more score
+        // 对于每一层来说，下层搜索的分数会以kScoreDecayFactor比例衰减，
+        // 即，对于较深层结点得到的分数，会按层级衰减若干倍，因此层级较浅的结点分数更重要，
+        // 这是为了让程序选择更快（更浅结点的策略）的走法，避免节外生枝。
+        // （有绝招干嘛不先出？留着煲汤？）
         if (score >= 2) score = static_cast<int>(score * kScoreDecayFactor);
 
-        // Calculate score difference
+        // 计算本步在本层实际得分，由预估的启发值减去下层的值得到
         move.actual_score = move.heuristic_val - score;
 
-        // Store back to candidate array
+        // 设置到候选走法（本层结点）中
         candidate_moves[i].actual_score = move.actual_score;
 
         // Print actual scores for debugging
 //        if (depth >= 8)
 //            std::cout << depth << " | " << move.r << ", " << move.c << ": " << move.actual_score << std::endl;
 
-        // Restore
+        // 恢复棋盘到搜索前的状态
         RenjuAIUtils::setCell(gs, move.r, move.c, 0);
 
-        // Update maximum score
+        // 更新本层宽度搜索得分最大值，试图寻找最大值
         if (move.actual_score > max_score) {
             max_score = move.actual_score;
             if (move_r != nullptr) *move_r = move.r;
             if (move_c != nullptr) *move_c = move.c;
         }
 
-        // Alpha-beta
+        // Alpha-beta剪枝
         int max_score_decayed = max_score;
         if (max_score >= 2) max_score_decayed = static_cast<int>(max_score_decayed * kScoreDecayFactor);
         if (max_score > alpha) alpha = max_score;
         if (enable_ab_pruning && max_score_decayed >= beta) break;
     }
 
-    // If no moves that are much better than blocking threatening moves, block them.
-    // This attempts blocking even winning is impossible if the opponent plays optimally.
+    // 如果本层是最浅层，就要考虑是否堵住对方的“绝招”
     if (depth == initial_depth && block_opponent && max_score < 0) {
         auto blocking_move = candidate_moves[0];
         int b_score = blocking_move.actual_score;
@@ -244,15 +258,12 @@ int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, in
     return max_score;
 }
 
-/*
- * 这个函数会尝试在棋盘上所有可以下的位置都放置一个棋子，然后评估每个棋子的启发值。
- * 在具体实现时，为了避免搜索范围过大，会将搜索区域收缩到当前已经放置了棋子的矩形区域附近
- */
+// 这个函数会尝试在棋盘上所有可以下的位置都放置一个棋子，然后评估每个棋子的启发值。
+// 在具体实现时，为了避免搜索范围过大，会将搜索区域收缩到当前已经放置了棋子的矩形区域附近
 void RenjuAINegamax::searchMovesOrdered(const char *gs, int player, std::vector<Move> *result) {
-    // Clear and previous result
+    // 清除结果
     result->clear();
 
-    // Find an extent to reduce unnecessary calls to RenjuAIUtils::remoteCell
     //这个过程就是收缩搜索区域，会生成一个矩形区域，我们称之为“含子区域”
     int min_r = INT_MAX, min_c = INT_MAX, max_r = INT_MIN, max_c = INT_MIN;
     for (int r = 0; r < g_board_size; ++r) {
@@ -274,15 +285,14 @@ void RenjuAINegamax::searchMovesOrdered(const char *gs, int player, std::vector<
     if (max_r + 2 >= g_board_size) max_r = g_board_size - 3;
     if (max_c + 2 >= g_board_size) max_c = g_board_size - 3;
 
-    // Loop through all cells
+
     // 搜索整个“尝试放置区域”，这个范围是由“兼容的尝试放置区域”每边向外扩展两格得到的
     for (int r = min_r - 2; r <= max_r + 2; ++r) {
         for (int c = min_c - 2; c <= max_c + 2; ++c) {
-            // Consider only empty cells
+
             // 已经下了棋子的区域就不尝试放置了
             if (gs[g_board_size * r + c] != 0) continue;
 
-            // Skip remote cells (no pieces within 2 cells)
             // 如果这个位置是一个远离当前“棋子团”的下棋位置，就不评估它了，直接跳过。
             // 也就是说程序不会无端地把棋子下在远离棋子集中区域的地方
             if (RenjuAIUtils::remoteCell(gs, r, c)) continue;
@@ -291,11 +301,10 @@ void RenjuAINegamax::searchMovesOrdered(const char *gs, int player, std::vector<
             m.r = r;
             m.c = c;
 
-            // Evaluate move
-            // 调用启发式评估函数评估这个下棋区域的启发值
+            // 调用启发式评估函数评估这个走法的启发值
             m.heuristic_val = RenjuAIEval::evalMove(gs, r, c, player);
 
-            // Add move
+            // 添加走法
             result->push_back(m);
         }
     }
