@@ -24,7 +24,7 @@
 #include <climits>
 #include <cstring>
 
-// Initialize global variables
+// 初始化棋谱变量
 RenjuAIEval::DirectionPattern *RenjuAIEval::preset_patterns = nullptr;
 int *RenjuAIEval::preset_scores = nullptr;
 int preset_patterns_size = 0;
@@ -120,7 +120,6 @@ int RenjuAIEval::matchPattern(DirectionMeasurement *all_direction_measurement,
     // 全局查找“棋谱”次数增1
     g_pm_count++;
 
-    // Initialize match_count to INT_MAX since minimum value will be output
     int match_count = INT_MAX, single_pattern_match = 0;
 
     // 每个方向的局势只查找两个棋谱
@@ -153,6 +152,7 @@ int RenjuAIEval::matchPattern(DirectionMeasurement *all_direction_measurement,
     return match_count;
 }
 
+// 测量四个方向的局势
 void RenjuAIEval::measureAllDirections(const char *gs,
                                        int r,
                                        int c,
@@ -221,7 +221,7 @@ void RenjuAIEval::measureDirection(const char *gs,
             // 如果延伸的格子是对方的棋子，延伸中止
             if (cell != player) break;
 
-            // 这个方向“一条”的长度
+            // 这个方向“一条”的长度增1
             result->length++;
         }
 
@@ -231,7 +231,7 @@ void RenjuAIEval::measureDirection(const char *gs,
         dr = -dr; dc = -dc;
     }
 
-    // 如果这“一条”大于5个棋子，
+    // 如果这“一条”大于5个棋子，统一到5
     if (result->length >= 5) {
         if (result->space_count == 0) {
             result->length = 5;
@@ -243,6 +243,7 @@ void RenjuAIEval::measureDirection(const char *gs,
     }
 }
 
+// 在内存中生成棋谱
 void RenjuAIEval::generatePresetPatterns(DirectionPattern **preset_patterns,
                                          int **preset_scores,
                                          int *preset_patterns_size,
@@ -297,6 +298,7 @@ void RenjuAIEval::generatePresetPatterns(DirectionPattern **preset_patterns,
     *preset_patterns_size = _size;
 }
 
+// 检查是否有棋手获胜
 int RenjuAIEval::winningPlayer(const char *gs) {
     if (gs == nullptr) return 0;
     for (int r = 0; r < g_board_size; ++r) {

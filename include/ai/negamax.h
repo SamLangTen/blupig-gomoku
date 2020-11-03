@@ -35,14 +35,14 @@ class RenjuAINegamax {
     // e.g. {10, 5, 2} -> 10, 10, 5, 5, 2, 2, 2, ...
     static int presetSearchBreadth[5];
 
-    // A move (candidate)
+    // 一个候选下法
     struct Move {
         int r;
         int c;
         int heuristic_val;
         int actual_score;
 
-        // Overloads < for sorting
+        // 重载<运算符用于给“下法”类排序
         bool operator<(Move other) const {
             return heuristic_val > other.heuristic_val;
         }

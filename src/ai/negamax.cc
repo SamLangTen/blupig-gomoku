@@ -312,6 +312,7 @@ void RenjuAINegamax::searchMovesOrdered(const char *gs, int player, std::vector<
     std::sort(result->begin(), result->end());
 }
 
+// 这个方法在整个项目中没有调用
 int RenjuAINegamax::negamax(char *gs, int player, int depth, int *move_r, int *move_c) {
     // Initialize with a minimum score
     int max_score = INT_MIN;
