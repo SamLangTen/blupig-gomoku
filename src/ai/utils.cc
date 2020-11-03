@@ -19,6 +19,8 @@
 #include <ai/utils.h>
 #include <random>
 
+// 判断这个下法是不是下在了远离棋局集中点以外的地方
+// 如果这个下法附近两个都没有其他棋子，就判断下在了远离棋局的地方
 bool RenjuAIUtils::remoteCell(const char *gs, int r, int c) {
     if (gs == nullptr) return false;
     for (int i = r - 2; i <= r + 2; ++i) {

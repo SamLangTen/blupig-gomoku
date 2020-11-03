@@ -52,7 +52,7 @@ class RenjuAINegamax {
                                 bool enable_ab_pruning, int alpha, int beta,
                                 int *move_r, int *move_c);
 
-    // Search possible moves based on a given state, sorted by heuristic values.
+    // 搜索所有可以下的位置，即宽度搜索
     static void searchMovesOrdered(const char *gs, int player, std::vector<Move> *result);
 
     // Currently not used
