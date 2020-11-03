@@ -43,6 +43,17 @@ int RenjuAINegamax::presetSearchBreadth[5] = {17, 7, 5, 3, 3};
 // prefers closer advantages
 #define kScoreDecayFactor 0.95f
 
+// 提供给外部调用的启发式Nagamax算法
+// 
+// 参数：
+// gs：游戏状态，即当前下了子的棋盘。可以看作是行优先存储的棋盘
+// player：玩家的使用的棋子颜色
+// depth：搜索深度
+// time_limit：搜索时间限制
+// enable_ab_pruning：是否启用alpha-beta剪枝
+// actual_depth：回传实际的搜索深度
+// move_r：计算出的下一步应下棋子的行
+// move_c：计算出的下一步应下的棋子的列
 void RenjuAINegamax::heuristicNegamax(const char *gs, int player, int depth, int time_limit, bool enable_ab_pruning,
                                       int *actual_depth, int *move_r, int *move_c) {
     // Check arguments
@@ -51,39 +62,47 @@ void RenjuAINegamax::heuristicNegamax(const char *gs, int player, int depth, int
         depth == 0 || depth < -1 ||
         time_limit < 0) return;
 
-    // Copy game state
+    //备份当前游戏状态，即棋盘，因为每次调用另一签名的heuristicNegamax方法都会改写_gs
     char *_gs = new char[g_gs_size];
     memcpy(_gs, gs, g_gs_size);
 
-    // Speedup first move
+    // 程序默认是使用迭代加深的搜索策略，但如果棋局刚开始，
+    // 可以直接设置一个深度进行搜索以加快速度，这里深度为6
     int _cnt = 0;
     for (int i = 0; i < static_cast<int>(g_gs_size); i++)
         if (_gs[i] != 0) _cnt++;
 
     if (_cnt <= 2) depth = 6;
 
-    // Fixed depth or iterative deepening
+    //根据逐层调用发现，depth传入时是-1，
+    //意味着如果depth是-1，即使用迭代加深的搜索策略
+    //否则搜索到指定深度即停止，且搜索只发生一次
     if (depth > 0) {
+        //设置回传的实际搜索深度
         if (actual_depth != nullptr) *actual_depth = depth;
+        //调用核心算法计算下棋位置
         heuristicNegamax(_gs, player, depth, depth, enable_ab_pruning,
                          INT_MIN / 2, INT_MAX / 2, move_r, move_c);
     } else {
-        // Iterative deepening
+
         std::clock_t c_start = std::clock();
+        //使用迭代加深的搜索策略，直到搜索时间超过了预设的time_limit，
+        //或搜索深度超过上限kMaximumDepth
         for (int d = 6;; d += 2) {
             std::clock_t c_iteration_start = std::clock();
 
-            // Reset game state
+            //搜索前还原上次迭代加深搜索修改的棋局
             memcpy(_gs, gs, g_gs_size);
 
-            // Execute negamax
+            //以本次迭代深度d进行启发式Negamax搜索
             heuristicNegamax(_gs, player, d, d, enable_ab_pruning,
                              INT_MIN / 2, INT_MAX / 2, move_r, move_c);
 
-            // Times
+            //用于计算是否超时
             std::clock_t c_iteration = (std::clock() - c_iteration_start) * 1000 / CLOCKS_PER_SEC;
             std::clock_t c_elapsed = (std::clock() - c_start) * 1000 / CLOCKS_PER_SEC;
 
+            //如果搜索时间超过了限制或搜索深度超过了限制则退出
             if (c_elapsed + (c_iteration * kAvgBranchingFactor * kAvgBranchingFactor) > time_limit ||
                 d >= kMaximumDepth) {
                 if (actual_depth != nullptr) *actual_depth = d;
@@ -95,13 +114,12 @@ void RenjuAINegamax::heuristicNegamax(const char *gs, int player, int depth, int
 }
 
 
-/*
- * 核心算法，用于生成搜索树。该方法递归调用，传入指定的搜索深度和时间限制，
- * 在每一次递归调用中都对深度和时间限制检查
- * 
- * 参数：
- * 
- */
+
+// 核心算法，用于进行搜索。该方法递归调用，传入指定的搜索深度
+// 
+// 参数：
+// 
+//
 int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, int depth,
                                      bool enable_ab_pruning, int alpha, int beta,
                                      int *move_r, int *move_c) {
