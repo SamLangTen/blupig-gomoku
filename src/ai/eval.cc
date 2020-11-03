@@ -35,7 +35,7 @@ int RenjuAIEval::evalState(const char *gs, int player) {
     if (gs == nullptr ||
         player < 1 || player > 2) return 0;
 
-    // Evaluate all possible moves
+    // 随意下，评估每一步
     int score = 0;
     for (int r = 0; r < g_board_size; ++r) {
         for (int c = 0; c < g_board_size; ++c) {
@@ -59,21 +59,22 @@ int RenjuAIEval::evalMove(const char *gs, int r, int c, int player) {
         generatePresetPatterns(&preset_patterns, &preset_scores, &preset_patterns_size, preset_patterns_skip);
     }
 
-    // Allocate 4 direction measurements
+    // 对于某个下法，测量它8个方向上棋子的分布情况，可以认为是8个方向的“局势”
     DirectionMeasurement adm[4];
 
-    // Measure in consecutive and non-consecutive conditions
+    // 连续和不连续的统计“局势”
     int max_score = 0;
     for (bool consecutive = false;; consecutive = true) {
-        // Execute measurement
+        // 测量所有方向的“局势”
         measureAllDirections(gs, r, c, player, consecutive, adm);
 
+        // 统计出了棋子分布情况（局势），通过不同方向的分布计算出不同的分数
         int score = evalADM(adm);
 
         // Prefer consecutive
         // if (!consecutive) score *= 0.9;
 
-        // Choose the better between consecutive and non-consecutive
+        // 不要求方向上己方棋子连续
         max_score = std::max(max_score, score);
 
         if (consecutive) break;
@@ -81,12 +82,15 @@ int RenjuAIEval::evalMove(const char *gs, int r, int c, int player) {
     return max_score;
 }
 
+// 通过某个下法测量出的各个方向的情况（“局势”），计算出分数
 int RenjuAIEval::evalADM(DirectionMeasurement *all_direction_measurement) {
     int score = 0;
     int size = preset_patterns_size;
 
-    // Add to score by length on each direction
-    // Find the maximum length in ADM and skip some patterns
+    // 每个方向评估出来的分数相加
+    // 每个方向棋子越长，分数越高，因为五子棋越长越好
+    // “棋谱”（present_patterns）内的下法有的长度超过了当前方向连续棋子的长度，
+    // 因此把这些棋谱忽略掉
     int max_measured_len = 0;
     for (int i = 0; i < 4; i++) {
         int len = all_direction_measurement[i].length;
@@ -95,30 +99,31 @@ int RenjuAIEval::evalADM(DirectionMeasurement *all_direction_measurement) {
     }
     int start_pattern = preset_patterns_skip[max_measured_len];
 
-    // Loop through and try to match all preset patterns
+    // 将所有方向的“局势”与“棋谱”进行匹配，如果匹配到“棋谱”，按照棋谱的分数给分
     for (int i = start_pattern; i < size; ++i) {
         score += matchPattern(all_direction_measurement, &preset_patterns[2 * i]) * preset_scores[i];
 
-        // Only match one threatening pattern
+        // 如果匹配到了“绝招”棋谱，直接退出，节省时间
         if (score >= kRenjuAiEvalThreateningScore) break;
     }
 
     return score;
 }
 
+// 将各个方向的“局势”与“棋谱”进行匹配
 int RenjuAIEval::matchPattern(DirectionMeasurement *all_direction_measurement,
                               DirectionPattern *patterns) {
     // Check arguments
     if (all_direction_measurement == nullptr) return -1;
     if (patterns == nullptr) return -1;
 
-    // Increment PM count
+    // 全局查找“棋谱”次数增1
     g_pm_count++;
 
     // Initialize match_count to INT_MAX since minimum value will be output
     int match_count = INT_MAX, single_pattern_match = 0;
 
-    // Currently allows maximum 2 patterns
+    // 每个方向的局势只查找两个棋谱
     for (int i = 0; i < 2; ++i) {
         auto p = patterns[i];
         if (p.length == 0) break;
@@ -126,11 +131,12 @@ int RenjuAIEval::matchPattern(DirectionMeasurement *all_direction_measurement,
         // Initialize counter
         single_pattern_match = 0;
 
-        // Loop through 4 directions
+        // 查找4个方向的局势
         for (int j = 0; j < 4; ++j) {
             auto dm = all_direction_measurement[j];
 
-            // Requires exact match
+            // 如果棋谱和局势完全匹配，匹配的数量增加
+            // 注意有的棋谱不要求block和space
             if (dm.length == p.length &&
                 (p.block_count == -1 || dm.block_count == p.block_count) &&
                 (p.space_count == -1 || dm.space_count == p.space_count)) {
@@ -141,7 +147,7 @@ int RenjuAIEval::matchPattern(DirectionMeasurement *all_direction_measurement,
         // Consider minimum number of occurrences
         single_pattern_match /= p.min_occurrence;
 
-        // Take smaller value
+        // 取匹配到的局势数量最少的棋谱的匹配次数
         match_count = match_count >= single_pattern_match ? single_pattern_match : match_count;
     }
     return match_count;
@@ -164,7 +170,10 @@ void RenjuAIEval::measureAllDirections(const char *gs,
     measureDirection(gs, r, c, 1, -1, player, consecutive, &adm[3]);
 }
 
-//测量某个方向的棋局情况并通过result返回
+// 测量某个方向的棋局局势并通过result返回，
+// 一个方向的局势大概是某个方向己方棋子一条连起来的情况，
+// 如果consecutive为true则必须是连续的己方棋子，否则可以空一格，但不能是对方棋子。
+// 本方法就是尝试向某个方向延伸，看指定方向“一条”的棋子的数量，以及检测有没有对方棋子堵在“一条”的两端
 void RenjuAIEval::measureDirection(const char *gs,
                                    int r, int c,
                                    int dr, int dc,
@@ -185,40 +194,44 @@ void RenjuAIEval::measureDirection(const char *gs,
 
     for (bool reversed = false;; reversed = true) {
         while (true) {
-            // Move
+            // 尝试向某个方向延伸一格
             cr += dr; cc += dc;
 
-            // Validate position
+            // 检测方向是否有效
             if (cr < 0 || cr >= g_board_size || cc < 0 || cc >= g_board_size) break;
 
-            // Get cell value
+            // 获取延伸的格子的下棋情况
             int cell = gs[g_board_size * cr + cc];
 
-            // Empty cells
+            // 如果延伸的格子没有被下，就看看是否要求连续
             if (cell == 0) {
+                // 如果space_allowance大于0，即允许一定数量的空格（不连续），则此次延伸合法
+                // 但是允许空格的数量要减1
                 if (space_allowance > 0 && RenjuAIUtils::getCell(gs, cr + dr, cc + dc) == player) {
                     space_allowance--; result->space_count++;
                     continue;
+                // 如果要求连续，则这个延伸不合法，本次延伸结束
+                // 但因为这“一条”尽头没有对方棋子堵住，所以block_count减1
                 } else {
                     result->block_count--;
                     break;
                 }
             }
 
-            // Another player
+            // 如果延伸的格子是对方的棋子，延伸中止
             if (cell != player) break;
 
-            // Current player
+            // 这个方向“一条”的长度
             result->length++;
         }
 
-        // Reverse direction and continue (just once)
+        // 从一开始下棋的位置方向延伸一次
         if (reversed) break;
         cr = r; cc = c;
         dr = -dr; dc = -dc;
     }
 
-    // More than 5 pieces in a row is equivalent to 5 pieces
+    // 如果这“一条”大于5个棋子，
     if (result->length >= 5) {
         if (result->space_count == 0) {
             result->length = 5;

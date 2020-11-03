@@ -27,57 +27,54 @@ class RenjuAIEval {
     RenjuAIEval();
     ~RenjuAIEval();
 
-    // Evaluate the entire game state as a player
+    // 评估这个游戏状态的得分
     static int evalState(const char *gs, int player);
 
-    // Evaluate one possible move as a player
+    // 评估某个下法的得分
     static int evalMove(const char *gs, int r, int c, int player);
 
-    // Check if any player is winning based on a given state
+    // 检查是否有棋手获胜
     static int winningPlayer(const char *gs);
 
 // Allow testing private members in this class
 #ifndef BLUPIG_TEST
  private:
 #endif
-    // Result of a single direction measurement
+    // 一个方向的“局势”
     struct DirectionMeasurement {
-        char length;          // Number of pieces in a row
-        char block_count;     // Number of ends blocked by edge or the other player (0-2)
-        char space_count;     // Number of spaces in the middle of pattern
+        char length;          // 这个方向的“局势”的长度
+        char block_count;     // 这个方向的“局势”两段被其他棋子或边界堵住的数量（0-2个）
+        char space_count;     // 这个方向的“局势”可以空出的棋子的数量，也就是允许不连续的下棋
     };
 
-    // A single direction pattern
+    // 一个方向的“局势”的棋谱
     struct DirectionPattern {
-        char min_occurrence;  // Minimum number of occurrences to match
-        char length;          // Length of pattern (pieces in a row)
-        char block_count;     // Number of ends blocked by edge or the other player (0-2)
-        char space_count;     // Number of spaces in the middle of pattern (-1: Ignore value)
+        char min_occurrence;  // 最小匹配次数
+        char length;          // 这个方向的“局势”的长度
+        char block_count;     // 这个方向的“局势”两段被其他棋子或边界堵住的数量（0-2个）
+        char space_count;     // 这个方向的“局势”可以空出的棋子的数量，也就是允许不连续的下棋
     };
 
-    // An array of preset patterns
+    // 用来存储生成的棋谱
     static DirectionPattern *preset_patterns;
 
-    // Preset scores of each preset pattern
+    // 用于保存每个棋谱的得分
     static int *preset_scores;
 
-    // Loads preset patterns into memory
-    // preset_patterns_skip is the number of patterns to skip for a maximum
-    // measured length in an all_direction_measurement (e.g. longest is 3 pieces
-    // in an ADM, then skip first few patterns that require 4 pieces or more).
+    // 在内存中生成棋谱
     static void generatePresetPatterns(DirectionPattern **preset_patterns,
                                        int **preset_scores,
                                        int *preset_patterns_size,
                                        int *preset_patterns_skip);
 
-    // Evaluates an all-direction measurement
+    // 评估四个方向的局势得分
     static int evalADM(DirectionMeasurement *all_direction_measurement);
 
-    // Tries to match a set of patterns with an all-direction measurement
+    // 尝试匹配某个方向的局势和棋谱
     static int matchPattern(DirectionMeasurement *all_direction_measurement,
                             DirectionPattern *patterns);
 
-    // Measures all 4 directions
+    // 测量四个方向的局势
     static void measureAllDirections(const char *gs,
                                      int r,
                                      int c,
@@ -85,7 +82,7 @@ class RenjuAIEval {
                                      bool consecutive,
                                      RenjuAIEval::DirectionMeasurement *adm);
 
-    // Measure a single direction
+    // 测量单个方向的局势
     static void measureDirection(const char *gs,
                                  int r, int c,
                                  int dr, int dc,
