@@ -30,9 +30,7 @@ class RenjuAINegamax {
                                  int *actual_depth, int *move_r, int *move_c);
 
  private:
-    // Preset search breadth
-    // From root to leaf, each element is for 2 layers
-    // e.g. {10, 5, 2} -> 10, 10, 5, 5, 2, 2, 2, ...
+    // 每层的搜索宽度
     static int presetSearchBreadth[5];
 
     // 一个候选下法
@@ -55,7 +53,7 @@ class RenjuAINegamax {
     // 搜索所有可以下的位置，即宽度搜索
     static void searchMovesOrdered(const char *gs, int player, std::vector<Move> *result);
 
-    // Currently not used
+    // 未使用
     static int negamax(char *gs, int player, int depth,
                        int *move_r, int *move_c);
 };

@@ -31,7 +31,7 @@ int preset_patterns_size = 0;
 int preset_patterns_skip[6] = {0};
 
 int RenjuAIEval::evalState(const char *gs, int player) {
-    // Check parameters
+    // 检查参数
     if (gs == nullptr ||
         player < 1 || player > 2) return 0;
 
@@ -113,7 +113,7 @@ int RenjuAIEval::evalADM(DirectionMeasurement *all_direction_measurement) {
 // 将各个方向的“局势”与“棋谱”进行匹配
 int RenjuAIEval::matchPattern(DirectionMeasurement *all_direction_measurement,
                               DirectionPattern *patterns) {
-    // Check arguments
+    // 检查参数
     if (all_direction_measurement == nullptr) return -1;
     if (patterns == nullptr) return -1;
 
@@ -159,11 +159,11 @@ void RenjuAIEval::measureAllDirections(const char *gs,
                                        int player,
                                        bool consecutive,
                                        RenjuAIEval::DirectionMeasurement *adm) {
-    // Check arguments
+    // 检查参数
     if (gs == nullptr) return;
     if (r < 0 || r >= g_board_size || c < 0 || c >= g_board_size) return;
 
-    // Measure 4 directions
+    // 测量四个方向的局势：右上、右下、右、下
     measureDirection(gs, r, c, 0,  1, player, consecutive, &adm[0]);
     measureDirection(gs, r, c, 1,  1, player, consecutive, &adm[1]);
     measureDirection(gs, r, c, 1,  0, player, consecutive, &adm[2]);
@@ -180,12 +180,12 @@ void RenjuAIEval::measureDirection(const char *gs,
                                    int player,
                                    bool consecutive,
                                    RenjuAIEval::DirectionMeasurement *result) {
-    // Check arguments
+    // 检查参数
     if (gs == nullptr) return;
     if (r < 0 || r >= g_board_size || c < 0 || c >= g_board_size) return;
     if (dr == 0 && dc == 0) return;
 
-    // Initialization
+    // 初始化参数，局势的“两头堵”先设置为都被堵，再根据延伸的情况减少
     int cr = r, cc = c;
     result->length = 1, result->block_count = 2, result->space_count = 0;
 
@@ -221,7 +221,7 @@ void RenjuAIEval::measureDirection(const char *gs,
             // 如果延伸的格子是对方的棋子，延伸中止
             if (cell != player) break;
 
-            // 这个方向“一条”的长度增1
+            // 这个方向“一条”的长度增1，包括空格
             result->length++;
         }
 
