@@ -206,8 +206,8 @@ int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, in
                                                 initial_depth,      // 最初设定的深度
                                                 depth - 1,          // 当前深度
                                                 enable_ab_pruning,  // Alpha-Beta剪枝
-                                                -beta,              //
-                                                -alpha + move.heuristic_val,
+                                                -beta,              // 交换max和min的分数，对于极大极小值算法而言，层与层之间搜索的敌我双方不同，因此要交换双方的极大极小值
+                                                -alpha + move.heuristic_val, //
                                                 nullptr,            // 对于启发式深度搜索而言，不需要具体策略
                                                 nullptr);           // 只需要得到本层不同结点出发的深度搜索能达到的最优值就可以了
 
@@ -237,10 +237,11 @@ int RenjuAINegamax::heuristicNegamax(char *gs, int player, int initial_depth, in
             if (move_c != nullptr) *move_c = move.c;
         }
 
-        // Alpha-beta剪枝
         int max_score_decayed = max_score;
         if (max_score >= 2) max_score_decayed = static_cast<int>(max_score_decayed * kScoreDecayFactor);
         if (max_score > alpha) alpha = max_score;
+
+        // 剪枝
         if (enable_ab_pruning && max_score_decayed >= beta) break;
     }
 
